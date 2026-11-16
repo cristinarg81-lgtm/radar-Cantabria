@@ -1,4 +1,111 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Radar</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>body{margin:0;font-family:Arial;background:#111;color:#fff}header{padding:10px}select,input,button{width:100%;padding:10px;margin:4px 0;border-radius:8px;border:0}button{background:#a3e635;font-weight:700}#map{height:50vh}.card{background:#222;padding:10px;margin:8px;border-radius:8px;border-left:4px solid #a3e635}.p{color:#a3e635;font-weight:700}</style></head><body><header><h3>📡 RADAR CANTABRIA</h3><select id="t"><option value="estetica">Estética</option><option value="peluqueria">Peluquería</option><option value="dentista">Dentista / Clínica</option><option value="bares">Bares</option><option value="tiendas">Tiendas</option><option value="gimnasio">Gimnasio</option><option value="todos">Todos</option></select><select id="c"><option>Santander</option><option>Torrelavega</option><option>Castro Urdiales</option><option>Laredo</option><option>Camargo</option><option>Piélagos</option></select><input id="u" placeholder="Otro pueblo..."><button onclick="s()">🔍 ESCANEAR</button><p id="st">Listo</p></header><div id="map"></div><div id="l"></div><script>
-let map=L.map('map').setView([43.4623,-3.8099],13);L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);let M=[];
-let Q={estetica:'node["shop"="beauty"](around:5000,LA,LO);node["shop"="nails"](around:5000,LA,LO);node["amenity"="spa"](around:5000,LA,LO);',peluqueria:'node["shop"="hairdresser"](around:5000,LA,LO);node["shop"="barber"](around:5000,LA,LO);',dentista:'node["amenity"="dentist"](around:5000,LA,LO);node["amenity"="clinic"](around:5000,LA,LO);',bares:'node["amenity"="restaurant"](around:5000,LA,LO);node["amenity"="bar"](around:5000,LA,LO);node["amenity"="cafe"](around:5000,LA,LO);',tiendas:'node["shop"](around:5000,LA,LO);',gimnasio:'node["leisure"="fitness_centre"](around:5000,LA,LO);',todos:'node["shop"](around:5000,LA,LO);node["amenity"](around:5000,LA,LO);'};
-async function s(){let ci=document.getElementById('u').value||document.getElementById('c').value;let ti=document.getElementById('t').value;document.getElementById('st').inner
+octype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radar Cantabria</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;background:#111;color:#f4f4f5}
+    *{box-sizing:border-box}body{margin:0;background:#111;color:#f4f4f5}main{max-width:850px;margin:auto;padding:22px 16px 40px}
+    h1{font-size:clamp(25px,6vw,38px);margin:8px 0 22px}label{display:block;font-size:14px;color:#c8cbd0;margin:14px 0 6px}
+    select,input,button{width:100%;min-height:48px;padding:12px 14px;border-radius:10px;border:1px solid #3d424a;font-size:16px}
+    select,input{background:#f0f0f0;color:#111}input::placeholder{color:#777}button{margin-top:14px;background:#a3e635;color:#111;font-weight:700;border:0;cursor:pointer}
+    button:disabled{opacity:.65;cursor:wait}#status{min-height:24px;margin:12px 0;color:#d1d5db}#map{height:42vh;min-height:280px;border-radius:12px;overflow:hidden;background:#20242a}
+    #results{display:grid;gap:10px;margin-top:14px}.card{background:#20242a;padding:14px;border-radius:10px;border-left:4px solid #a3e635}.card h2{font-size:18px;margin:0 0 8px}.card p{margin:5px 0;color:#d1d5db}.card a{color:#93c5fd;overflow-wrap:anywhere}.muted{color:#a1a1aa}
+  </style>
+</head>
+<body>
+<main>
+  <h1>📡 RADAR CANTABRIA</h1>
+  <label for="type">Tipo de negocio</label>
+  <select id="type">
+    <option value="estetica">Estética</option><option value="peluqueria">Peluquería</option>
+    <option value="dentista">Dentista / clínica</option><option value="bares">Bares y restaurantes</option>
+    <option value="tiendas">Tiendas</option><option value="gimnasio">Gimnasios</option><option value="todos">Todos</option>
+  </select>
+  <label for="town">Municipio</label>
+  <select id="town">
+    <option value="Santander">Santander</option><option value="Torrelavega">Torrelavega</option>
+    <option value="Castro-Urdiales">Castro Urdiales</option><option value="Laredo">Laredo</option>
+    <option value="Camargo">Camargo</option><option value="Piélagos">Piélagos</option>
+  </select>
+  <input id="other" placeholder="Otro municipio de Cantabria…" autocomplete="off">
+  <button id="scan" type="button">🔎 ESCANEAR</button>
+  <p id="status" role="status" aria-live="polite">Listo para buscar.</p>
+  <div id="map" aria-label="Mapa de negocios encontrados"></div>
+  <section id="results" aria-live="polite"></section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+  const places = {
+    Santander:[43.4623,-3.8099], 'Torrelavega':[43.3494,-4.0479],
+    'Castro-Urdiales':[43.3828,-3.2206], Laredo:[43.4111,-3.4165],
+    Camargo:[43.4075,-3.8849], 'Piélagos':[43.3892,-3.9510]
+  };
+  const filters = {
+    estetica:['node["shop"="beauty"]','way["shop"="beauty"]','node["shop"="nails"]','way["shop"="nails"]','node["amenity"="spa"]','way["amenity"="spa"]'],
+    peluqueria:['node["shop"="hairdresser"]','way["shop"="hairdresser"]','node["shop"="barber"]','way["shop"="barber"]'],
+    dentista:['node["amenity"="dentist"]','way["amenity"="dentist"]','node["amenity"="clinic"]','way["amenity"="clinic"]'],
+    bares:['node["amenity"="restaurant"]','way["amenity"="restaurant"]','node["amenity"="bar"]','way["amenity"="bar"]','node["amenity"="cafe"]','way["amenity"="cafe"]'],
+    tiendas:['node["shop"]','way["shop"]'],
+    gimnasio:['node["leisure"="fitness_centre"]','way["leisure"="fitness_centre"]'],
+    todos:['node["shop"]','way["shop"]','node["amenity"]','way["amenity"]']
+  };
+  const map = L.map('map').setView(places.Santander,13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
+  const markers=L.layerGroup().addTo(map);
+  const status=document.getElementById('status'), results=document.getElementById('results'), button=document.getElementById('scan');
+
+  async function findTown(name){
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&country=Spain&city='+encodeURIComponent(name);
+    const response=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(!response.ok) throw new Error('No se pudo localizar ese municipio.');
+    const data=await response.json();
+    if(!data.length) throw new Error('No encuentro ese municipio. Escribe otro nombre.');
+    return [Number(data[0].lat),Number(data[0].lon)];
+  }
+  async function scan(){
+    const custom=document.getElementById('other').value.trim();
+    const selected=document.getElementById('town').value;
+    const town=custom||selected;
+    button.disabled=true; results.replaceChildren(); markers.clearLayers();
+    status.textContent='Buscando negocios en '+town+'…';
+    try{
+      const center=custom?await findTown(custom):places[selected];
+      map.setView(center,13);
+      const bits=filters[document.getElementById('type').value]||filters.todos;
+      const selectors=bits.map(q=>q+'(around:5000,'+center[0]+','+center[1]+');').join('');
+      const query='[out:json][timeout:25];('+selectors+');out center tags;';
+      const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:'data='+encodeURIComponent(query)});
+      if(!response.ok) throw new Error('El servicio de búsqueda no responde ahora. Prueba de nuevo en un minuto.');
+      const data=await response.json();
+      const items=(data.elements||[]).filter(x=>x.tags&&(x.tags.name||x.tags['addr:street']));
+      if(!items.length){status.textContent='Búsqueda completada: no hay negocios de ese tipo registrados en OpenStreetMap en esta zona.';return;}
+      const bounds=[];
+      for(const item of items){
+        const lat=item.lat??item.center?.lat, lon=item.lon??item.center?.lon;
+        if(typeof lat!=='number'||typeof lon!=='number') continue;
+        const t=item.tags, name=t.name||'Negocio sin nombre en el mapa', point=[lat,lon]; bounds.push(point);
+        const marker=L.marker(point).bindPopup('<strong>'+escapeHtml(name)+'</strong>'); markers.addLayer(marker);
+        const card=document.createElement('article'); card.className='card';
+        const title=document.createElement('h2'); title.textContent=name; card.append(title);
+        const address=[t['addr:street'],t['addr:housenumber'],t['addr:postcode'],t['addr:city']].filter(Boolean).join(' ');
+        if(address){const p=document.createElement('p');p.textContent='📍 '+address;card.append(p);}
+        if(t.phone||t['contact:phone']){const p=document.createElement('p');p.textContent='☎ '+(t.phone||t['contact:phone']);card.append(p);}
+        const website=t.website||t['contact:website'];
+        if(website){const p=document.createElement('p'),a=document.createElement('a');a.href=/^https?:\/\//i.test(website)?website:'https://'+website;a.target='_blank';a.rel='noopener';a.textContent=website;p.append(a);card.append(p);}
+        results.append(card);
+      }
+      if(bounds.length) map.fitBounds(bounds,{padding:[24,24],maxZoom:14});
+      status.textContent='Encontrados '+bounds.length+' negocios. Los datos dependen de lo que esté registrado en OpenStreetMap.';
+    }catch(error){status.textContent='Error: '+error.message;}
+    finally{button.disabled=false;}
+  }
+  function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  button.addEventListener('click',scan);
+})();
+</script>
+</body>
+</html>
