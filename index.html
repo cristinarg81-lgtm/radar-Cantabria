@@ -79,7 +79,7 @@
       const selectors=bits.map(q=>q+'(around:5000,'+center[0]+','+center[1]+');').join('');
       const query='[out:json][timeout:25];('+selectors+');out center tags;';
       const requestBody='data='+encodeURIComponent(query);
-      const endpoints=[
+      const endpoints=['https://ovp.dresel.systems/api/interpreter',
         'https://overpass.private.coffee/api/interpreter',
         'https://overpass-api.de/api/interpreter'
       ];
