@@ -20,7 +20,7 @@
   <h1>📡 RADAR CANTABRIA</h1>
   <label for="type">Tipo de negocio</label>
   <select id="type">
-    <option value="estetica">Estética</option><option value="peluqueria">Peluquería</option>
+    <option value="estetica">Estética</option><option value="herbolarios">Herbolarios</option><option value="peluqueria">Peluquería</option>
     <option value="dentista">Dentista / clínica</option><option value="bares">Bares y restaurantes</option>
     <option value="tiendas">Tiendas</option><option value="gimnasio">Gimnasios</option><option value="todos">Todos</option>
   </select>
@@ -44,14 +44,40 @@
     'Castro-Urdiales':[43.3828,-3.2206], Laredo:[43.4111,-3.4165],
     Camargo:[43.4075,-3.8849], 'Piélagos':[43.3892,-3.9510]
   };
+  // Búsqueda ampliada: nwr incluye puntos, edificios y relaciones de OSM.
   const filters = {
-    estetica:['node["shop"="beauty"]','way["shop"="beauty"]','node["shop"="nails"]','way["shop"="nails"]','node["amenity"="spa"]','way["amenity"="spa"]'],
-    peluqueria:['node["shop"="hairdresser"]','way["shop"="hairdresser"]','node["shop"="barber"]','way["shop"="barber"]'],
-    dentista:['node["amenity"="dentist"]','way["amenity"="dentist"]','node["amenity"="clinic"]','way["amenity"="clinic"]'],
-    bares:['node["amenity"="restaurant"]','way["amenity"="restaurant"]','node["amenity"="bar"]','way["amenity"="bar"]','node["amenity"="cafe"]','way["amenity"="cafe"]'],
-    tiendas:['node["shop"]','way["shop"]'],
-    gimnasio:['node["leisure"="fitness_centre"]','way["leisure"="fitness_centre"]'],
-    todos:['node["shop"]','way["shop"]','node["amenity"]','way["amenity"]']
+    estetica:[
+      'nwr["shop"~"^(beauty|nails|massage)$"]',
+      'nwr["amenity"="spa"]',
+      'nwr["healthcare"~"^(beauty|cosmetic|dermatology)$"]',
+      'nwr["craft"="beautician"]'
+    ],
+    herbolarios:[
+      'nwr["shop"~"^(herbalist|health_food|nutrition_supplements)$"]',
+      'nwr["healthcare:speciality"="herbalism"]'
+    ],
+    peluqueria:[
+      'nwr["shop"~"^(hairdresser|barber)$"]',
+      'nwr["craft"="hairdresser"]'
+    ],
+    dentista:[
+      'nwr["amenity"="dentist"]',
+      'nwr["healthcare"="dentist"]'
+    ],
+    bares:[
+      'nwr["amenity"~"^(restaurant|bar|cafe|pub|fast_food)$"]'
+    ],
+    tiendas:['nwr["shop"]'],
+    gimnasio:[
+      'nwr["leisure"~"^(fitness_centre|sports_centre)$"]',
+      'nwr["sport"="fitness"]'
+    ],
+    todos:[
+      'nwr["shop"]',
+      'nwr["amenity"~"^(restaurant|bar|cafe|pub|fast_food|dentist|spa|clinic)$"]',
+      'nwr["leisure"~"^(fitness_centre|sports_centre)$"]',
+      'nwr["healthcare:speciality"="herbalism"]'
+    ]
   };
   const map = L.map('map').setView(places.Santander,13);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
@@ -76,10 +102,12 @@
       const center=custom?await findTown(custom):places[selected];
       map.setView(center,13);
       const bits=filters[document.getElementById('type').value]||filters.todos;
-      const selectors=bits.map(q=>q+'(around:5000,'+center[0]+','+center[1]+');').join('');
+      const radius=document.getElementById('type').value==='todos'?5000:10000;
+      const selectors=bits.map(q=>q+'(around:'+radius+','+center[0]+','+center[1]+');').join('');
       const query='[out:json][timeout:25];('+selectors+');out center tags;';
       const requestBody='data='+encodeURIComponent(query);
-      const endpoints=['https://ovp.dresel.systems/api/interpreter',
+      const endpoints=[
+        'https://ovp.dresel.systems/api/interpreter',
         'https://overpass.private.coffee/api/interpreter',
         'https://overpass-api.de/api/interpreter'
       ];
@@ -96,13 +124,13 @@
         finally{clearTimeout(timer);}
       }
       if(!data) throw new Error(lastError?.name==='AbortError'?'Los servidores de búsqueda tardaron demasiado. Vuelve a intentarlo en unos minutos.':'No se pudo conectar con los servidores de OpenStreetMap. Comprueba tu conexión y vuelve a intentarlo.');
-      const items=(data.elements||[]).filter(x=>x.tags&&(x.tags.name||x.tags['addr:street']));
+      const items=(data.elements||[]).filter(x=>x.tags&&(x.tags.name||x.tags.brand||x.tags.operator||x.tags.phone||x.tags['contact:phone']||x.tags.website||x.tags['contact:website']));
       if(!items.length){status.textContent='Búsqueda completada: no hay negocios de ese tipo registrados en OpenStreetMap en esta zona.';return;}
       const bounds=[];
       for(const item of items){
         const lat=item.lat??item.center?.lat, lon=item.lon??item.center?.lon;
         if(typeof lat!=='number'||typeof lon!=='number') continue;
-        const t=item.tags, name=t.name||'Negocio sin nombre en el mapa', point=[lat,lon]; bounds.push(point);
+        const t=item.tags, name=t.name||t.brand||t.operator||'Negocio sin nombre en el mapa', point=[lat,lon]; bounds.push(point);
         const marker=L.marker(point).bindPopup('<strong>'+escapeHtml(name)+'</strong>'); markers.addLayer(marker);
         const card=document.createElement('article'); card.className='card';
         const title=document.createElement('h2'); title.textContent=name; card.append(title);
